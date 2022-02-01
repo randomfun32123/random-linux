@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+
+yay_updated="no"
+privilage="sudo"      #Manual Fixed Override, Default: unknown
+spec_repo="0"
+
+# Help
+print_help() {
+    echo ""
+    echo "update-all - update all repositories on your system"
+    echo ""
+    echo "usage: update-all -h | -s"
+    echo ""
+    echo "Options:"
+    echo "-h       prints this help message"
+    echo "-s       select the secuity method"
+    echo ""
+}
+
+# Flags
+while getopts 'hs:' flag
+do
+    case "${flag}" in
+        s) privilage="${OPTARG}" ;;
+        h) print_help
+           exit 1 ;;
+    esac
+done
+
+
+# Determine Privilage Method
+# whatever comes last is prefered
+
+# Sudo
+if [ -f /usr/bin/sudo ] && [[ $privilage = "unknown" ]]
+then
+    privilage="sudo"
+fi
+
+# DOAS
+if [ -f /usr/bin/doas ] && [[ $privilage = "unknown" ]]
+then
+    privilage="doas"
+fi
+
+
+# Finish Up
+if [[ $privilage = "unknown" ]]
+then
+    echo "Unknown privilige method"
+    exit 1
+fi
+
+# Setting up privilages
+
+# Sudo
+if [[ $privilage = "sudo" ]]
+then
+    privilage_normal_invoke="sudo -u ${SUDO_USER:-${USER}}"
+fi
+
+# DOAS
+if [[ $privilage = "doas" ]]
+then
+    echo ${DOAS_USER:-${USER}}
+    privilage_normal_invoke="doas -u ${DOAS_USER:-${USER}}"
+fi
+
+
+# Finally updating
+
+# yay
+if [[ -f /usr/bin/yay ]]
+then
+    $privilage_normal_invoke yay -Syyuu
+    $privilage_normal_invoke yay -Yc
+    yay_updated="yes"
+fi
+
+
+# Pacman if yay doesn't exist
+if [[ $yay_updated = "no" ]]
+then
+    pacman -Syyuu
+fi
+
+
+# Flatpak
+if [[ -f /usr/bin/flatpak ]]
+then
+    flatpak update
+fi
+
+
+# Snap
+if [[ -f /usr/bin/snap ]]
+then
+    snap refresh
+fi

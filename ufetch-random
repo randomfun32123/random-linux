@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# ufetch-arch - tiny system info for arch
+
+## INFO
+
+# user is already defined
+host="$(cat /etc/hostname)"
+os='Random Linux'
+kernel="$(uname -sr)"
+uptime="$(uptime -p | sed 's/up //')"
+shell="$(basename "${SHELL}")"
+user="$(users)"
+
+# package formats
+pacman_packages="$(pacman -Qn | wc -l)"
+
+packages="$pacman_packages (Pacman)"
+
+if [ -n "$(pacman -Qm | wc -l)" ]
+then
+	aur_packages="$(pacman -Qm | wc -l)"
+	packages="$packages, $aur_packages (AUR)"
+fi
+
+if [[ -f "/usr/bin/flatpak" ]]
+then
+	flatpak_packages="$(flatpak list | wc -l)"
+	packages="$packages, $flatpak_packages (Flatpak)"
+fi
+
+if [[ -f "/usr/bin/snap" ]]
+then
+	snap_packages="$(snap list | wc -l)"
+	packages="$packages, $snap_packages (Snap)"
+fi
+
+## UI DETECTION
+
+parse_rcs() {
+	for f in "${@}"; do
+		wm="$(tail -n 1 "${f}" 2> /dev/null | cut -d ' ' -f 2)"
+		[ -n "${wm}" ] && echo "${wm}" && return
+	done
+}
+
+rcwm="$(parse_rcs "${HOME}/.xinitrc" "${HOME}/.xsession")"
+
+ui='unknown'
+uitype='UI'
+if [ -n "${DE}" ]; then
+	ui="${DE}"
+	uitype='DE'
+elif [ -n "${WM}" ]; then
+	ui="${WM}"
+	uitype='WM'
+elif [ -n "${XDG_CURRENT_DESKTOP}" ]; then
+	ui="${XDG_CURRENT_DESKTOP}"
+	uitype='DE'
+elif [ -n "${DESKTOP_SESSION}" ]; then
+	ui="${DESKTOP_SESSION}"
+	uitype='DE'
+elif [ -n "${rcwm}" ]; then
+	ui="${rcwm}"
+	uitype='WM'
+elif [ -n "${XDG_SESSION_TYPE}" ]; then
+	ui="${XDG_SESSION_TYPE}"
+fi
+
+ui="$(basename "${ui}")"
+
+## DEFINE COLORS
+
+# probably don't change these
+if [ -x "$(command -v tput)" ]; then
+	bold="$(tput bold)"
+	black="$(tput setaf 0)"
+	red="$(tput setaf 1)"
+	green="$(tput setaf 2)"
+	yellow="$(tput setaf 3)"
+	blue="$(tput setaf 4)"
+	magenta="$(tput setaf 5)"
+	cyan="$(tput setaf 6)"
+	white="$(tput setaf 7)"
+	reset="$(tput sgr0)"
+fi
+
+# you can change these
+lc="${reset}${bold}${blue}"         # labels
+nc="${reset}${bold}${blue}"         # user and hostname
+ic="${reset}"                       # info
+c0="${reset}${green}"                # first color
+c1="${reset}${yellow}"
+c2="${reset}${orange}"
+c3="${reset}${red}"
+c4="${reset}${magenta}"
+c5="${reset}${cyan}"
+
+## OUTPUT
+
+cat <<EOF
+
+${c4} MMMMMMMb.  ${c0}MM         ${lc}${user}@${host}
+${c3} MM     Mb  ${c1}MM	  ${lc}OS:        ${ic}${os}${reset}
+${c5} MM     MM  ${c5}MM    ${lc}KERNEL:    ${ic}${kernel}${reset}
+${c1} MM     MM  ${c3}MM	  ${lc}UPTIME:    ${ic}${uptime}${reset}
+${c0} MM    .M9  ${c4}MM    ${lc}PACKAGES:  ${ic}${packages}${reset}
+${c0} MMMMMMM9'  ${c4}MM    ${lc}SHELL:     ${ic}${shell}${reset}
+${c1} MM  \M\    ${c3}MM    ${lc}UI:        ${ic}${ui}${reset}
+${c5} MM   \M\   ${c5}MM
+${c3} MM    \M\  ${c1}MM    /
+${c4}_MM_    \M\_${c0}MMMMMMM
+${ic}
+
+EOF
